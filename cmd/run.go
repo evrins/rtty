@@ -12,12 +12,23 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"text/template"
 	"time"
 	"unicode/utf8"
+
+	"github.com/asdine/storm"
+	"github.com/filebrowser/filebrowser/v2/auth"
+	"github.com/filebrowser/filebrowser/v2/diskcache"
+	fbhttp "github.com/filebrowser/filebrowser/v2/http"
+	"github.com/filebrowser/filebrowser/v2/img"
+	"github.com/filebrowser/filebrowser/v2/settings"
+	"github.com/filebrowser/filebrowser/v2/storage/bolt"
+	"github.com/filebrowser/filebrowser/v2/users"
+	"github.com/spf13/afero"
 
 	_ "embed"
 
@@ -34,6 +45,9 @@ var indexJS string
 
 //go:embed public
 var public embed.FS
+
+//go:embed dist
+var fbDist embed.FS
 
 // run command
 var command string = getenv("SHELL", "bash")
@@ -234,6 +248,12 @@ var runCmd = &cobra.Command{
 		mux.HandleFunc("/index.js", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(indexJS))
 		})
+
+		fbHandler, err := initFileBrowser()
+		if err != nil {
+			return
+		}
+		mux.Handle("/fb/", http.StripPrefix("/fb", fbHandler))
 		mux.Handle("/ws", websocket.Handler(run))
 
 		server := &http.Server{
@@ -297,6 +317,87 @@ var runCmd = &cobra.Command{
 			log.Println("failed to shutdown server", err)
 		}
 	},
+}
+
+func initFileBrowser() (fbHandler http.Handler, err error) {
+	imgSrv := img.New(4)
+
+	fbDir := filepath.Join(os.TempDir(), "fb")
+	log.Println("filebrowser dir", fbDir)
+	cacheDir := filepath.Join(fbDir, "cache")
+	if err := os.MkdirAll(cacheDir, 0700); err != nil { //nolint:govet,gomnd
+		log.Fatalf("can't make directory %s: %s", cacheDir, err)
+	}
+	fileCache := diskcache.New(afero.NewOsFs(), cacheDir)
+
+	storePath := filepath.Join(fbDir, "store.db")
+	db, err := storm.Open(storePath)
+	if err != nil {
+		return
+	}
+
+	store, err := bolt.NewStorage(db)
+	if err != nil {
+		return
+	}
+	key, err := settings.GenerateKey()
+	if err != nil {
+		return
+	}
+	s := &settings.Settings{
+		Key:        key,
+		Signup:     false,
+		Shell:      []string{},
+		AuthMethod: auth.MethodNoAuth,
+		Defaults:   settings.UserDefaults{},
+		Branding: settings.Branding{
+			Name:            "Hello",
+			DisableExternal: false,
+			Files:           "",
+		},
+	}
+	err = store.Settings.Save(s)
+	if err != nil {
+		return
+	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "/"
+	}
+	srvParams := &settings.Server{
+		Root:             pwd,
+		BaseURL:          "/fb/",
+		Log:              filepath.Join(fbDir, "log.log"),
+		EnableThumbnails: true,
+		ResizePreview:    true,
+	}
+	err = store.Settings.SaveServer(srvParams)
+	if err != nil {
+		return
+	}
+	err = store.Auth.Save(&auth.NoAuth{})
+	if err != nil {
+		return
+	}
+	err = store.Users.Save(&users.User{
+		ID:       1,
+		Username: "admin",
+		Password: "admin",
+	})
+	if err != nil {
+		return
+	}
+
+	assetsFs, err := fs.Sub(fbDist, "dist")
+	if err != nil {
+		return
+	}
+
+	fbHandler, err = fbhttp.NewHandler(imgSrv, fileCache, store, srvParams, assetsFs)
+	if err != nil {
+		return
+	}
+	return
 }
 
 func init() {
