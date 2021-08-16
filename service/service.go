@@ -3,10 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	"github.com/skanehira/rtty/public"
-	"github.com/skanehira/rtty/utils"
 	"html/template"
 	"io"
 	"log"
@@ -20,6 +16,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/skanehira/rtty/public"
+	"github.com/skanehira/rtty/utils"
 )
 
 // run command
@@ -85,6 +86,16 @@ func StartWebService(addr, port, font, fontSize string, openView bool) (err erro
 	app.GET("/index.js", func(c echo.Context) error {
 		c.Response().Header().Set("Content-Type", "application/javascript")
 		return c.String(http.StatusOK, indexJS)
+	})
+
+	fbHandler, err := initFileBrowser()
+	if err != nil {
+		return
+	}
+
+	app.Any("/fb/*", func(c echo.Context) error {
+		http.StripPrefix("/fb", fbHandler).ServeHTTP(c.Response(), c.Request())
+		return nil
 	})
 
 	app.Any("/proxy/:port/*", func(c echo.Context) error {

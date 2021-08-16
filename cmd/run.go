@@ -48,6 +48,8 @@ var runCmd = &cobra.Command{
 	},
 }
 
+
+
 func init() {
 	runCmd.PersistentFlags().IntP("port", "p", 9999, "server port")
 	runCmd.PersistentFlags().StringP("addr", "a", "0.0.0.0", "server address")
