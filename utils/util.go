@@ -1,4 +1,4 @@
-package cmd
+package utils
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ func OpenBrowser(url string) {
 	}
 }
 
-func filter(ss []string) []string {
+func Filter(ss []string) []string {
 	rs := []string{}
 
 	for _, s := range ss {
@@ -41,7 +41,7 @@ func filter(ss []string) []string {
 	return rs
 }
 
-func getenv(key, def string) string {
+func GetEnv(key, def string) string {
 	v := os.Getenv(key)
 	if v != "" {
 		return v
@@ -49,7 +49,7 @@ func getenv(key, def string) string {
 	return def
 }
 
-func windowSize(msg interface{}) (rows, cols uint16, err error) {
+func WindowSize(msg interface{}) (rows, cols uint16, err error) {
 	data, ok := msg.(map[string]interface{})
 	if !ok {
 		return 0, 0, fmt.Errorf("invalid message: %#+v", msg)
