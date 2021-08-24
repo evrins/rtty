@@ -5,10 +5,13 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"io"
 	"io/fs"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -41,6 +44,24 @@ var command string = getenv("SHELL", "bash")
 // wait time for server start
 var waitTime = 500
 var checkProcInterval = 5
+
+type ProxyItem struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
+}
+
+var proxyList []ProxyItem = []ProxyItem{
+	{Name: "Prometheus", Url: "/proxy/9090"},
+	{Name: "PMM", Url: "/proxy/9001"},
+	{Name: "PMM", Url: "/proxy/9015"},
+	{Name: "UWM", Url: "/proxy/9003"},
+	{Name: "UWM", Url: "/proxy/8098"},
+	{Name: "SCM", Url: "/proxy/9009"},
+	{Name: "SCM", Url: "/proxy/9017"},
+	{Name: "ODM", Url: "/proxy/9011"},
+	{Name: "RMK", Url: "/proxy/8888"},
+	{Name: "AlertManager", Url: "/proxy/9093"},
+}
 
 type Event string
 
@@ -220,8 +241,8 @@ var runCmd = &cobra.Command{
 		indexJS = strings.Replace(indexJS, "{fontSize}", template.JSEscapeString(fontSize), 1)
 
 		var serverErr error
-		mux := http.NewServeMux()
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		router := mux.NewRouter()
+		router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(indexHTML))
 		})
 		sub, err := fs.Sub(public, "public")
@@ -229,16 +250,42 @@ var runCmd = &cobra.Command{
 			return
 		}
 		publicHandler := http.FileServer(http.FS(sub))
-		mux.Handle("/css/", publicHandler)
-		mux.Handle("/js/", publicHandler)
-		mux.HandleFunc("/index.js", func(w http.ResponseWriter, r *http.Request) {
+		router.PathPrefix("/css").Handler(publicHandler)
+		router.PathPrefix("/js").Handler(publicHandler)
+
+		router.HandleFunc("/index.js", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(indexJS))
 		})
-		mux.Handle("/ws", websocket.Handler(run))
+		subRouter := router.PathPrefix("/proxy/{port:[0-9]+}")
+		subRouter.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			vars := mux.Vars(r)
+			port := vars["port"]
+			path := strings.TrimPrefix(r.URL.Path, fmt.Sprintf("/proxy/%s", port))
+			u := &url.URL{
+				Scheme: "http",
+				Host:   fmt.Sprintf("127.0.0.1:%s", port),
+			}
+			r.URL.Path = path
+			r.RequestURI = r.URL.RequestURI()
+			proxy := httputil.NewSingleHostReverseProxy(u)
+			proxy.ServeHTTP(w, r)
+		})
+		router.HandleFunc("/proxy-list", func(w http.ResponseWriter, r *http.Request) {
+			content, err := json.Marshal(proxyList)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(content)
+		})
+		router.Handle("/ws", websocket.Handler(run))
 
 		server := &http.Server{
 			Addr:    addr + ":" + port,
-			Handler: mux,
+			Handler: router,
 		}
 
 		go func() {
