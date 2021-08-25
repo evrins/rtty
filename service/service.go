@@ -13,10 +13,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/skanehira/rtty/public"
@@ -48,10 +50,10 @@ var proxyList []ProxyItem = []ProxyItem{
 	{Name: "AlertManager", Url: "/proxy/9093"},
 }
 
-func StartWebService(addr, port, font, fontSize string, openView bool) (err error) {
+func StartWebService(addr string, port int, font, fontSize, consulHost string, openView bool) (err error) {
 	indexJS := public.IndexJS
 	indexJS = strings.Replace(indexJS, "{addr}", template.JSEscapeString(addr), 1)
-	indexJS = strings.Replace(indexJS, "{port}", port, 1)
+	indexJS = strings.Replace(indexJS, "{port}", strconv.Itoa(port), 1)
 	indexJS = strings.Replace(indexJS, "{fontFamily}", template.JSEscapeString(font), 1)
 	indexJS = strings.Replace(indexJS, "{fontSize}", template.JSEscapeString(fontSize), 1)
 
@@ -74,6 +76,13 @@ func StartWebService(addr, port, font, fontSize string, openView bool) (err erro
 	})
 
 	app.GET("ws", ServeWs)
+
+	app.GET("/live", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+
+	p := prometheus.NewPrometheus("echo", nil)
+	p.Use(app)
 
 	app.GET("/css/*", func(c echo.Context) error {
 		http.FileServer(http.FS(public.CssFiles)).ServeHTTP(c.Response(), c.Request())
@@ -157,11 +166,18 @@ func StartWebService(addr, port, font, fontSize string, openView bool) (err erro
 
 	go func() {
 		log.Println("running command: " + command)
-		host := fmt.Sprintf("%s:%s", addr, port)
+		host := fmt.Sprintf("%s:%d", addr, port)
 		log.Printf("running http://%s \n", host)
 
 		if serverErr := app.Start(host); serverErr != nil {
 			log.Println(serverErr)
+		}
+	}()
+
+	go func() {
+		err = utils.Register(consulHost, port)
+		if err != nil {
+			log.Println("fail to register to consul ", err)
 		}
 	}()
 

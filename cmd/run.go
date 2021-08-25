@@ -5,7 +5,6 @@ import (
 	"github.com/skanehira/rtty/service"
 	"github.com/skanehira/rtty/utils"
 	"github.com/spf13/cobra"
-	"strconv"
 )
 
 var command = utils.GetEnv("SHELL", "bash")
@@ -17,11 +16,10 @@ var runCmd = &cobra.Command{
 		if len(args) > 0 {
 			command = args[0]
 		}
-		portFlag, err := cmd.PersistentFlags().GetInt("port")
+		port, err := cmd.PersistentFlags().GetInt("port")
 		if err != nil {
 			return
 		}
-		port := strconv.Itoa(portFlag)
 
 		font, err := cmd.PersistentFlags().GetString("font")
 		if err != nil {
@@ -39,8 +37,11 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return
 		}
-
-		err = service.StartWebService(addr, port, font, fontSize, openView)
+		consul, err := cmd.PersistentFlags().GetString("consul")
+		if err != nil {
+			return
+		}
+		err = service.StartWebService(addr, port, font, fontSize, consul, openView)
 		if err != nil {
 			return
 		}
@@ -48,13 +49,12 @@ var runCmd = &cobra.Command{
 	},
 }
 
-
-
 func init() {
 	runCmd.PersistentFlags().IntP("port", "p", 9999, "server port")
 	runCmd.PersistentFlags().StringP("addr", "a", "0.0.0.0", "server address")
 	runCmd.PersistentFlags().String("font", "", "font")
 	runCmd.PersistentFlags().String("font-size", "", "font size")
 	runCmd.PersistentFlags().BoolP("view", "v", false, "open browser")
+	runCmd.PersistentFlags().String("consul", "192.168.112.23:8500", "consul address")
 	rootCmd.AddCommand(runCmd)
 }
