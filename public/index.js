@@ -23,7 +23,7 @@ terminal.open(document.getElementById('terminal'));
 terminal.focus();
 fitAddon.fit();
 
-const socket = new WebSocket('ws://{addr}:{port}/ws');
+const socket = new WebSocket(`ws://${window.location.host}/ws`);
 
 socket.onopen = () => {
   const msg = {
