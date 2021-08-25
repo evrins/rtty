@@ -129,7 +129,6 @@ func ServeWs(c echo.Context) (err error) {
 						log.Println("failed to set window size:", err)
 						return
 					}
-					continue
 
 				case EventSendKey:
 					data, ok := msg.Data.(string)
