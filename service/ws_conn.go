@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/creack/pty"
 	"github.com/labstack/echo/v4"
 	"github.com/skanehira/rtty/utils"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -47,8 +49,49 @@ func (ws *WsConn) Write(b []byte) (i int, err error) {
 	return n, e
 }
 
+type SocketLimit struct {
+	Limit int
+	Count int
+	sync.Mutex
+}
+
+func New(limit int) *SocketLimit {
+	return &SocketLimit{Limit: limit}
+}
+
+func (s *SocketLimit) Incr() {
+	s.Lock()
+	defer s.Unlock()
+	s.Count++
+}
+
+func (s *SocketLimit) Desc() {
+	s.Lock()
+	defer s.Unlock()
+	s.Count--
+}
+
+func (s *SocketLimit) Exceed() bool {
+	s.Lock()
+	defer s.Unlock()
+	return s.Count >= s.Limit
+}
+
+const limit = 256
+
+var s = New(limit)
+
 func ServeWs(c echo.Context) (err error) {
 	websocket.Handler(func(conn *websocket.Conn) {
+		if s.Exceed() {
+			_, err = conn.Write([]byte(fmt.Sprintf("connection exceed limit %d\n", limit)))
+			if err != nil {
+				log.Println("fail to write exceed message ", err)
+			}
+			return
+		}
+		s.Incr()
+		defer s.Desc()
 		defer conn.Close()
 		var ptmx *os.File
 		var execCmd *exec.Cmd
