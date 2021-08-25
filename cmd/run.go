@@ -50,7 +50,7 @@ var runCmd = &cobra.Command{
 
 func init() {
 	runCmd.PersistentFlags().IntP("port", "p", 9999, "server port")
-	runCmd.PersistentFlags().StringP("addr", "a", "localhost", "server address")
+	runCmd.PersistentFlags().StringP("addr", "a", "0.0.0.0", "server address")
 	runCmd.PersistentFlags().String("font", "", "font")
 	runCmd.PersistentFlags().String("font-size", "", "font size")
 	runCmd.PersistentFlags().BoolP("view", "v", false, "open browser")
