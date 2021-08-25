@@ -8,11 +8,11 @@ import (
 	"strconv"
 )
 
-var command string = utils.GetEnv("SHELL", "bash")
+var command = utils.GetEnv("SHELL", "bash")
 
 var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Run command",
+	Use:   "run [Command]",
+	Short: fmt.Sprintf("Run specified command (default \"%s\")", command),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		if len(args) > 0 {
 			command = args[0]
@@ -54,23 +54,5 @@ func init() {
 	runCmd.PersistentFlags().String("font", "", "font")
 	runCmd.PersistentFlags().String("font-size", "", "font size")
 	runCmd.PersistentFlags().BoolP("view", "v", false, "open browser")
-	runCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Printf(`Run command
-
-Usage:
-  rtty run [command] [flags]
-
-Command
-  Execute specified command (default "%s")
-
-Flags:
-  -a, --addr string        server address
-      --font string        font
-      --font-size string   font size
-  -h, --help               help for run
-  -p, --port int           server port (default 9999)
-  -v, --view               open browser
-`, command)
-	})
 	rootCmd.AddCommand(runCmd)
 }
