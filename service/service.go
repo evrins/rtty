@@ -8,12 +8,15 @@ import (
 	"github.com/skanehira/rtty/public"
 	"github.com/skanehira/rtty/utils"
 	"html/template"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -54,6 +57,17 @@ func StartWebService(addr, port, font, fontSize string, openView bool) (err erro
 	app := echo.New()
 	app.Use(middleware.Recover())
 	app.Use(middleware.Logger())
+	app.Use(middleware.CORS())
+	app.HTTPErrorHandler = func(err error, c echo.Context) {
+		err2 := c.JSON(http.StatusInternalServerError, Resp{Msg: err.Error()})
+		if err2 != nil {
+			log.Println("error on handling custom error ", err2)
+		}
+	}
+	app.GET("/favicon.ico", func(c echo.Context) error {
+		return c.Blob(http.StatusOK, "application/image", []byte{})
+	})
+
 	app.GET("/", func(c echo.Context) error {
 		return c.HTML(http.StatusOK, public.IndexHTML)
 	})
@@ -90,6 +104,39 @@ func StartWebService(addr, port, font, fontSize string, openView bool) (err erro
 
 	app.GET("/proxy-list", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, proxyList)
+	})
+
+	app.POST("/upload", func(c echo.Context) (err error) {
+		form, err := c.MultipartForm()
+		if err != nil {
+			return
+		}
+		tempDir := os.TempDir()
+		for k, v := range form.File {
+			log.Println(k, v)
+			log.Println("tempDir ", tempDir)
+			dir := filepath.Join(tempDir, filepath.Dir(k))
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return
+			}
+			var f multipart.File
+			f, err = v[0].Open()
+			if err != nil {
+				return
+			}
+			tf := filepath.Join(tempDir, k)
+			var tff *os.File
+			tff, err = os.Create(tf)
+			if err != nil {
+				return
+			}
+			_, err = io.Copy(tff, f)
+			if err != nil {
+				return
+			}
+		}
+		return c.JSON(http.StatusOK, Resp{Msg: "saved into " + tempDir})
 	})
 
 	go func() {
