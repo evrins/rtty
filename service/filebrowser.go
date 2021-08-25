@@ -9,7 +9,7 @@ import (
 	"github.com/filebrowser/filebrowser/v2/settings"
 	"github.com/filebrowser/filebrowser/v2/storage/bolt"
 	"github.com/filebrowser/filebrowser/v2/users"
-	"github.com/skanehira/rtty/dist"
+	"github.com/skanehira/rtty/fbdist"
 	"github.com/spf13/afero"
 
 	"log"
@@ -101,7 +101,7 @@ func initFileBrowser() (fbHandler http.Handler, err error) {
 
 	err = store.Users.Save(user)
 
-	fbHandler, err = fbhttp.NewHandler(imgSrv, fileCache, store, srvParams, dist.Dist)
+	fbHandler, err = fbhttp.NewHandler(imgSrv, fileCache, store, srvParams, fbdist.Dist)
 	if err != nil {
 		return
 	}
