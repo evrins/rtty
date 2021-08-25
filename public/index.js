@@ -25,18 +25,6 @@ fitAddon.fit();
 
 const socket = new WebSocket('ws://{addr}:{port}/ws');
 
-// workaround
-// for redraw terminal screen when reload window
-const redraw = (socket, msg) => {
-  msg.data.cols--
-  terminal.resize(msg.data.cols, msg.data.rows)
-  socket.send(JSON.stringify(msg));
-
-  msg.data.cols++
-  terminal.resize(msg.data.cols, msg.data.rows)
-  socket.send(JSON.stringify(msg));
-}
-
 socket.onopen = () => {
   const msg = {
     event: "resize",
@@ -46,8 +34,6 @@ socket.onopen = () => {
     },
   };
   socket.send(JSON.stringify(msg));
-
-  redraw(socket, msg)
 
   terminal.onData(data => {
     switch (socket.readyState) {
