@@ -93,6 +93,11 @@ func StartWebService(addr, port, font, fontSize string, openView bool) (err erro
 		return
 	}
 
+	app.Any("/fb", func(c echo.Context) error {
+		http.StripPrefix("/fb", fbHandler).ServeHTTP(c.Response(), c.Request())
+		return nil
+	})
+
 	app.Any("/fb/*", func(c echo.Context) error {
 		http.StripPrefix("/fb", fbHandler).ServeHTTP(c.Response(), c.Request())
 		return nil
