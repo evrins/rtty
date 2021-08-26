@@ -1,0 +1,10 @@
+[Unit]
+Description=web-terminal
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/rtty run --port 10000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

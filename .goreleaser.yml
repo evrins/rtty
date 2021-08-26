@@ -7,6 +7,11 @@ before:
 archives:
   - name_template: "{{ .ProjectName }}_{{ if index .Env \"BUILD_ID\" }}{{ .Env.BUILD_ID }}{{ else }}{{ .ShortCommit }}{{ end }}_{{ .Arch }}"
     format: zip
+    wrap_in_directory: true
+    files:
+      - rtty.service
+      - install.sh
+      - README.md
 
 builds:
   - main: .
