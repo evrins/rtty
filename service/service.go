@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
-	"html/template"
 	"io"
+	"io/fs"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -51,16 +50,20 @@ var proxyList []ProxyItem = []ProxyItem{
 }
 
 func StartWebService(addr string, port int, font, fontSize, consulHost string, openView bool) (err error) {
-	indexJS := public.IndexJS
-	indexJS = strings.Replace(indexJS, "{addr}", template.JSEscapeString(addr), 1)
-	indexJS = strings.Replace(indexJS, "{port}", strconv.Itoa(port), 1)
-	indexJS = strings.Replace(indexJS, "{fontFamily}", template.JSEscapeString(font), 1)
-	indexJS = strings.Replace(indexJS, "{fontSize}", template.JSEscapeString(fontSize), 1)
-
 	app := echo.New()
 	app.Use(middleware.Recover())
 	app.Use(middleware.Logger())
 	app.Use(middleware.CORS())
+
+	sfs, err := fs.Sub(public.TermFront, "term-front")
+	if err != nil {
+		return
+	}
+	app.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+		HTML5:      true,
+		Filesystem: http.FS(sfs),
+	}))
+
 	app.HTTPErrorHandler = func(err error, c echo.Context) {
 		err2 := c.JSON(http.StatusInternalServerError, Resp{Msg: err.Error()})
 		if err2 != nil {
@@ -71,10 +74,6 @@ func StartWebService(addr string, port int, font, fontSize, consulHost string, o
 		return c.Blob(http.StatusOK, "application/image", []byte{})
 	})
 
-	app.GET("/", func(c echo.Context) error {
-		return c.HTML(http.StatusOK, public.IndexHTML)
-	})
-
 	app.GET("ws", ServeWs)
 
 	app.GET("/live", func(c echo.Context) error {
@@ -83,19 +82,6 @@ func StartWebService(addr string, port int, font, fontSize, consulHost string, o
 
 	p := prometheus.NewPrometheus("echo", nil)
 	p.Use(app)
-
-	app.GET("/css/*", func(c echo.Context) error {
-		http.FileServer(http.FS(public.CssFiles)).ServeHTTP(c.Response(), c.Request())
-		return nil
-	})
-	app.GET("/js/*", func(c echo.Context) error {
-		http.FileServer(http.FS(public.JsFiles)).ServeHTTP(c.Response(), c.Request())
-		return nil
-	})
-	app.GET("/index.js", func(c echo.Context) error {
-		c.Response().Header().Set("Content-Type", "application/javascript")
-		return c.String(http.StatusOK, indexJS)
-	})
 
 	fbHandler, err := initFileBrowser()
 	if err != nil {

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/asdine/storm"
+	"github.com/asdine/storm/v3"
 	"github.com/filebrowser/filebrowser/v2/auth"
 	"github.com/filebrowser/filebrowser/v2/diskcache"
 	fbhttp "github.com/filebrowser/filebrowser/v2/http"
@@ -86,7 +86,6 @@ func initFileBrowser() (fbHandler http.Handler, err error) {
 	if err != nil {
 		return
 	}
-
 
 	password, _ := users.HashPwd("admin")
 

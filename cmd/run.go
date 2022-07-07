@@ -55,6 +55,6 @@ func init() {
 	runCmd.PersistentFlags().String("font", "", "font")
 	runCmd.PersistentFlags().String("font-size", "", "font size")
 	runCmd.PersistentFlags().BoolP("view", "v", false, "open browser")
-	runCmd.PersistentFlags().String("consul", "192.168.112.23:8500", "consul address")
+	runCmd.PersistentFlags().String("consul", "192.168.112.26:8500", "consul address")
 	rootCmd.AddCommand(runCmd)
 }
